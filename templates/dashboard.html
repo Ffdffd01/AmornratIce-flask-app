@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div>
+            <div class="logo">Welcome, {{ username }} </div>
+            <div class="nav-links">
+                <a href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Home </a>
+                <a href="{{ url_for('sales') }}"><i class="fas fa-chart-line"></i> Sales</a>
+                <a href="{{ url_for('expenses') }}"><i class="fas fa-receipt"></i> Expenses</a>
+                <a href="{{ url_for('calendar') }}" class="active"><i class="fas fa-calendar-alt"></i> Calendar</a>
+            </div>            
+        </div>
+        <div class="sidebar-bottom">
+            <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i>Logout</a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header">
+            <h1>Dashboard</h1>
+        </div>
+
+        <!-- Dashboard Body -->
+        <div class="dashboard">
+            <!-- Sales Section -->
+            <div class="sales-container">
+                <h2>Sales Overview</h2>
+                <div class="sales-cards" style="display: flex; justify-content: space-between; gap: 10px;">
+                    <div class="card">
+                        <h3>Total Sales</h3>
+                        <p class="amount amount-green">${{ total_sales }}</p>
+                    </div>
+                    <div class="card">
+                        <h3>Total Pending</h3>
+                        <p class="amount amount-red">${{ total_pending }}</p>
+                    </div>
+                    <div class="card">
+                        <h3>Net Sales</h3>
+                        <p class="amount amount-green">${{ net_sale }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expenses Section -->
+            <div class="section">
+                <h2>Expenses Overview</h2>
+                <div class="expenses-cards">
+                    <div class="card">
+                        <h3>Paid Expenses</h3>
+                        <p class="amount amount-red">${{ paid_expenses }}</p>
+                    </div>
+                    <div class="card">
+                        <h3>Pending Expenses</h3>
+                        <p class="amount amount-red">${{ pending_expenses }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart Section -->
+            <div class="section">
+                <h2>Daily Comparison</h2>
+                <div class="chart-header">
+                    <div class="date-range">
+                        <label for="start-date">Start Date:</label>
+                        <input type="date" id="start-date" name="start-date">
+                        <label for="end-date">End Date:</label>
+                        <input type="date" id="end-date" name="end-date">
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="chart-box">
+                    <canvas id="dashboardChart" width="600" height="300"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>&copy; 2025 Amornrat Ice Company Limited<br>Contact Us: amornratice57@gmail.com, 02 395 0010</p>
+        </div>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('dashboardChart').getContext('2d');
+
+        // Dummy daily data (replace with dynamic data if available)
+        const labels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+        const dailySales = [150, 200, 180, 220, 250, 300, 280];
+        const dailyPending = [20, 30, 25, 40, 35, 50, 45];
+        const dailyExpensesPaid = [300, 350, 320, 400, 420, 460, 430];
+        const dailyExpensesPending = [100, 90, 80, 120, 110, 130, 125];
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Daily Sales',
+                        data: dailySales,
+                        borderColor: '#618c26',
+                        backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                        fill: true,
+                    },
+                    {
+                        label: 'Daily Pending',
+                        data: dailyPending,
+                        borderColor: 'red',
+                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                        fill: true,
+                    },
+                    {
+                        label: 'Expenses Paid',
+                        data: dailyExpensesPaid,
+                        borderColor: '#0077b6',
+                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                        fill: true,
+                    },
+                    {
+                        label: 'Expenses Pending',
+                        data: dailyExpensesPending,
+                        borderColor: 'orange',
+                        backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                        fill: true,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Daily Sales and Expenses Comparison',
+                    },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Amount ($)',
+                        },
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Days',
+                        },
+                    },
+                },
+            },
+        });
+    </script>
+
+</body>
+</html>

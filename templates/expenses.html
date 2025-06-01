@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Expenses Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div>
+            <div class="logo">Welcome, {{ username }}</div>
+            <div class="nav-links">
+                <a href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Home</a>
+                <a href="{{ url_for('sales') }}"><i class="fas fa-chart-line"></i> Sales</a>
+                <a href="{{ url_for('expenses') }}" class="active"><i class="fas fa-receipt"></i> Expenses</a>
+                <a href="{{ url_for('calendar') }}"><i class="fas fa-calendar-alt"></i> Calendar</a>
+            </div>
+        </div>
+        <div class="sidebar-bottom">
+            <a href="{{ url_for('logout') }}"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="header">
+            <h1>Expenses Dashboard</h1>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="flash-message {{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Expenses Section -->
+        <div class="sales-container">
+            <!-- Expenses Form and Graph Section -->
+            <div class="sales-section">
+                <!-- Expenses Form -->
+                <div class="sales-form-container">
+                    <h2>Enter Expense Details</h2>
+                    <form class="sales-form" method="POST" action="{{ url_for('expenses') }}">
+                        <div class="form-group">
+                            <label for="expenseName">Expense Name</label>
+                            <input type="text" id="expenseName" name="expenseName" class="form-control" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="expenseAmount">Expense Amount (THB)</label>
+                            <input type="number" id="expenseAmount" name="expenseAmount" class="form-control" min="0" step="0.01" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="expenseDate">Expense Date</label>
+                            <input type="date" id="expenseDate" name="expenseDate" class="form-control" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="expenseStatus">Status</label>
+                            <select id="expenseStatus" name="expenseStatus" class="form-control" required>
+                                <option value="Paid">Paid</option>
+                                <option value="Pending">Pending</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="submit-btn">Submit Expense</button>
+                    </form>
+                </div>
+
+                <!-- Expenses Graph -->
+                <div class="sales-graph-container">
+                    <h2>Expenses Trend</h2>
+                    <div class="graph-box">
+                        <canvas id="expensesTrendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expenses List -->
+            <div class="sales-list-container">
+                <h2>Expenses List</h2>
+                <div class="sales-controls">
+                    <div class="search-box">
+                        <input type="text" id="expensesSearch" placeholder="Search expenses..." onkeyup="filterExpenses()">
+                    </div>
+                    <div class="sales-filters">
+                        <select id="dateFilter" onchange="filterExpenses()">
+                            <option value="all">All Time</option>
+                            <option value="today">Today</option>
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                            <option value="year">This Year</option>
+                        </select>
+                        <select id="statusFilter" onchange="filterExpenses()">
+                            <option value="all">All Status</option>
+                            <option value="Paid">Paid</option>
+                            <option value="Pending">Pending</option>
+                        </select>
+                        <button onclick="exportExpenses()" class="export-btn">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="sales-table" id="expensesTable">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)">Expense Name <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable(1)">Amount (THB) <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable(2)">Date <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable(3)">Status <i class="fas fa-sort"></i></th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for expense in expenses %}
+                            <tr>
+                                <td>{{ expense.name }}</td>
+                                <td>฿{{ "{:,.2f}".format(expense.amount) }}</td>
+                                <td>{{ expense.date }}</td>
+                                <td>
+                                    <span class="status-badge {{ expense.status.lower() }}">
+                                        {{ expense.status }}
+                                    </span>
+                                </td>
+                                <td class="action-buttons">
+                                    <button onclick="editExpense('{{ expense.id }}')" class="edit-btn">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('delete_expense', expense_id=expense.id) }}" 
+                                          class="delete-form" onsubmit="return confirm('Are you sure you want to delete this expense?');">
+                                        <button type="submit" class="delete-btn">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="no-data">No expenses data available.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>&copy; 2025 Amornrat Ice Company Limited<br>Contact Us: amornratice57@gmail.com, 02 395 0010</p>
+        </div>
+    </div>
+
+    <!-- Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // Table sorting
+        function sortTable(n) {
+            const table = document.getElementById('expensesTable');
+            const tbody = table.getElementsByTagName('tbody')[0];
+            const rows = Array.from(tbody.getElementsByTagName('tr'));
+            const headers = table.getElementsByTagName('th');
+            const currentHeader = headers[n];
+            
+            // Toggle sort direction
+            const isAsc = currentHeader.classList.contains('asc');
+            headers.forEach(header => header.classList.remove('asc', 'desc'));
+            currentHeader.classList.add(isAsc ? 'desc' : 'asc');
+
+            rows.sort((a, b) => {
+                const x = a.getElementsByTagName('td')[n].textContent;
+                const y = b.getElementsByTagName('td')[n].textContent;
+                
+                // Handle currency and numbers
+                const xValue = x.replace(/[฿,]/g, '');
+                const yValue = y.replace(/[฿,]/g, '');
+                
+                if (!isNaN(xValue) && !isNaN(yValue)) {
+                    return isAsc ? 
+                        parseFloat(xValue) - parseFloat(yValue) : 
+                        parseFloat(yValue) - parseFloat(xValue);
+                }
+                
+                return isAsc ? 
+                    x.localeCompare(y) : 
+                    y.localeCompare(x);
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Filter expenses
+        function filterExpenses() {
+            const searchText = document.getElementById('expensesSearch').value.toLowerCase();
+            const dateFilter = document.getElementById('dateFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+            const rows = document.querySelectorAll('#expensesTable tbody tr');
+            const today = new Date();
+            
+            rows.forEach(row => {
+                const expenseName = row.cells[0].textContent.toLowerCase();
+                const expenseDate = new Date(row.cells[2].textContent);
+                const expenseStatus = row.cells[3].textContent.trim();
+                
+                const matchesSearch = expenseName.includes(searchText);
+                const matchesStatus = statusFilter === 'all' || expenseStatus === statusFilter;
+                
+                let matchesDate = true;
+                if (dateFilter !== 'all') {
+                    const diffTime = Math.abs(today - expenseDate);
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    switch(dateFilter) {
+                        case 'today':
+                            matchesDate = diffDays === 0;
+                            break;
+                        case 'week':
+                            matchesDate = diffDays <= 7;
+                            break;
+                        case 'month':
+                            matchesDate = diffDays <= 30;
+                            break;
+                        case 'year':
+                            matchesDate = diffDays <= 365;
+                            break;
+                    }
+                }
+                
+                row.style.display = matchesSearch && matchesDate && matchesStatus ? '' : 'none';
+            });
+        }
+
+        // Export expenses data
+        function exportExpenses() {
+            const table = document.getElementById('expensesTable');
+            const rows = Array.from(table.querySelectorAll('tr'));
+            
+            // Remove the last column (Actions)
+            const data = rows.map(row => 
+                Array.from(row.cells)
+                    .slice(0, -1)
+                    .map(cell => cell.textContent.trim())
+            );
+            
+            // Convert to CSV
+            const csvContent = data.map(row => row.join(',')).join('\n');
+            
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'expenses_data.csv';
+            link.click();
+        }
+
+        // Chart initialization
+        const chartData = {
+            labels: JSON.parse('{{ chart_labels|tojson|safe }}'),
+            datasets: [{
+                label: 'Expenses Amount (THB)',
+                data: JSON.parse('{{ chart_data|tojson|safe }}'),
+                borderColor: '#e74c3c',
+                backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                fill: true,
+                tension: 0.3
+            }]
+        };
+
+        const chartOptions = {
+            responsive: true,
+            plugins: {
+                legend: { display: true },
+                title: {
+                    display: true,
+                    text: 'Expenses Trend'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '฿' + value.toLocaleString('th-TH');
+                        }
+                    }
+                }
+            }
+        };
+
+        const ctx = document.getElementById('expensesTrendChart').getContext('2d');
+        const expensesTrendChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: chartOptions
+        });
+    </script>
+</body>
+</html>
