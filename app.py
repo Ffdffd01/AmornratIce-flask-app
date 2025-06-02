@@ -10,6 +10,7 @@ from collections import defaultdict
 from firebase_admin import credentials, initialize_app, auth, firestore
 from dotenv import load_dotenv
 import secrets
+import json
 
 # Load environment variables
 load_dotenv()
@@ -19,9 +20,22 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 csrf = CSRFProtect(app)
 
 # Initialize Firebase
-cred = credentials.Certificate(os.getenv('FIREBASE_CREDENTIALS_PATH'))
-initialize_app(cred)
-db = firestore.client()
+try:
+    # Try to get credentials from environment variable first
+    firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
+    if firebase_credentials:
+        # Parse the JSON string from environment variable
+        cred_dict = json.loads(firebase_credentials)
+        cred = credentials.Certificate(cred_dict)
+    else:
+        # Fall back to file-based credentials
+        cred = credentials.Certificate(os.getenv('FIREBASE_CREDENTIALS_PATH'))
+    
+    firebase_app = initialize_app(cred)
+    db = firestore.client()
+except Exception as e:
+    print(f"Firebase initialization error: {str(e)}")
+    raise
 
 # ------------------ Forms ------------------ #
 class RegistrationForm(FlaskForm):
