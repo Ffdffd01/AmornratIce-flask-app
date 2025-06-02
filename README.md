@@ -85,9 +85,9 @@ The application uses environment variables for sensitive configuration:
 
 ## 👨‍💻 Developer
 
-Built with ❤️ by [Your Name]
-- GitHub: [Your GitHub Profile]
-- LinkedIn: [Your LinkedIn Profile]
+Built with ❤️ by Ong Phurimpat
+- GitHub: Ffdffd01
+- LinkedIn: Phurimpat Hirunboonyawat
 
 ## 📝 License
 
