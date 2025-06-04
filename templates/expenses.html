@@ -50,25 +50,42 @@
                     <form class="sales-form" method="POST" action="{{ url_for('expenses') }}">
                         {{ form.hidden_tag() }}
                         <div class="form-group">
-                            <label for="expenseName">Expense Name</label>
-                            <input type="text" id="expenseName" name="expenseName" class="form-control" required />
+                            {{ form.expenseName.label }}
+                            {{ form.expenseName(class="form-control") }}
+                            {% if form.expenseName.errors %}
+                                {% for error in form.expenseName.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
                         </div>
                         <div class="form-group">
-                            <label for="expenseAmount">Expense Amount (THB)</label>
-                            <input type="number" id="expenseAmount" name="expenseAmount" class="form-control" min="0" step="0.01" required />
+                            {{ form.expenseAmount.label }}
+                            {{ form.expenseAmount(class="form-control", min="0", step="0.01") }}
+                            {% if form.expenseAmount.errors %}
+                                {% for error in form.expenseAmount.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
                         </div>
                         <div class="form-group">
-                            <label for="expenseDate">Expense Date</label>
-                            <input type="date" id="expenseDate" name="expenseDate" class="form-control" required />
+                            {{ form.expenseDate.label }}
+                            {{ form.expenseDate(class="form-control") }}
+                            {% if form.expenseDate.errors %}
+                                {% for error in form.expenseDate.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
                         </div>
                         <div class="form-group">
-                            <label for="expenseStatus">Status</label>
-                            <select id="expenseStatus" name="expenseStatus" class="form-control" required>
-                                <option value="Paid">Paid</option>
-                                <option value="Pending">Pending</option>
-                            </select>
+                            {{ form.expenseStatus.label }}
+                            {{ form.expenseStatus(class="form-control") }}
+                            {% if form.expenseStatus.errors %}
+                                {% for error in form.expenseStatus.errors %}
+                                    <span class="error">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
                         </div>
-                        <button type="submit" class="submit-btn">Submit Expense</button>
+                        <button type="submit" class="submit-btn">{{ form.submit.label.text }}</button>
                     </form>
                 </div>
 
@@ -134,7 +151,7 @@
                                     </button>
                                     <form method="POST" action="{{ url_for('delete_expense', expense_id=expense.id) }}" 
                                           class="delete-form" onsubmit="return confirm('Are you sure you want to delete this expense?');">
-                                        {{ form.csrf_token }}
+                                        {{ form.hidden_tag() }}
                                         <button type="submit" class="delete-btn">
                                             <i class="fas fa-trash"></i>
                                         </button>

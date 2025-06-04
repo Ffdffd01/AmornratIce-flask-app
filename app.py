@@ -11,6 +11,12 @@ from firebase_admin import credentials, initialize_app, auth, firestore
 from dotenv import load_dotenv
 import secrets
 import json
+import logging
+import traceback
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -31,9 +37,22 @@ try:
     cred = credentials.Certificate(cred_dict)
     firebase_app = initialize_app(cred)
     db = firestore.client()
+    logger.info("Firebase initialized successfully")
 except Exception as e:
-    print(f"Firebase initialization error: {str(e)}")
+    logger.error(f"Firebase initialization error: {str(e)}")
+    logger.error(traceback.format_exc())
     raise
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal Server Error: {str(error)}")
+    logger.error(traceback.format_exc())
+    return render_template('error.html', error="An internal server error occurred. Please try again later."), 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    logger.error(f"Not Found Error: {str(error)}")
+    return render_template('error.html', error="The requested page was not found."), 404
 
 # ------------------ Forms ------------------ #
 class RegistrationForm(FlaskForm):
@@ -158,36 +177,57 @@ def sales():
         return redirect(url_for('index'))
     form = SalesForm()
     if form.validate_on_submit():
-        data = {
-            'customer_name': form.customerName.data,
-            'quantity': form.quantity.data,
-            'price_per_unit': form.pricePerUnit.data,
-            'sale_date': form.saleDate.data.strftime('%Y-%m-%d'),
-            'sale_amount': form.quantity.data * form.pricePerUnit.data,
-            'status': form.saleStatus.data
-        }
-        db.collection('sales').add(data)
-        flash('Sale added.', 'success')
-        return redirect(url_for('sales'))
+        try:
+            sale_amount = float(form.quantity.data) * float(form.pricePerUnit.data)
+            data = {
+                'customer_name': form.customerName.data,
+                'quantity': int(form.quantity.data),
+                'price_per_unit': float(form.pricePerUnit.data),
+                'sale_date': form.saleDate.data.strftime('%Y-%m-%d'),
+                'sale_amount': sale_amount,
+                'status': form.saleStatus.data
+            }
+            db.collection('sales').add(data)
+            flash('Sale added successfully.', 'success')
+            return redirect(url_for('sales'))
+        except Exception as e:
+            logger.error(f"Error adding sale: {str(e)}")
+            logger.error(traceback.format_exc())
+            flash(f'Error adding sale: {str(e)}', 'error')
+            return redirect(url_for('sales'))
 
-    sales_docs = db.collection('sales').stream()
-    sales_data = []
-    monthly_sales = defaultdict(float)
-    for doc in sales_docs:
-        sale = doc.to_dict()
-        sale['id'] = doc.id
-        sales_data.append(sale)
-        # Only count paid sales in the monthly total
-        if sale.get('status') == 'Paid':
-            dt = datetime.strptime(sale['sale_date'], '%Y-%m-%d')
-            monthly_sales[dt.strftime('%b %Y')] += sale.get('sale_amount', 0)
-    
-    sorted_data = sorted(monthly_sales.items(), key=lambda x: datetime.strptime(x[0], '%b %Y'))
-    chart_labels = [k for k, _ in sorted_data]
-    chart_data = [v for _, v in sorted_data]
+    try:
+        sales_docs = db.collection('sales').stream()
+        sales_data = []
+        monthly_sales = defaultdict(float)
+        for doc in sales_docs:
+            sale = doc.to_dict()
+            sale['id'] = doc.id
+            # Ensure all required fields exist with default values
+            sale['customer_name'] = sale.get('customer_name', '')
+            sale['quantity'] = sale.get('quantity', 0)
+            sale['price_per_unit'] = float(sale.get('price_per_unit', 0))
+            sale['sale_amount'] = float(sale.get('sale_amount', 0))
+            sale['sale_date'] = sale.get('sale_date', '')
+            sale['status'] = sale.get('status', 'Pending')
+            sales_data.append(sale)
+            # Only count paid sales in the monthly total
+            if sale['status'] == 'Paid':
+                dt = datetime.strptime(sale['sale_date'], '%Y-%m-%d')
+                monthly_sales[dt.strftime('%b %Y')] += sale['sale_amount']
+        
+        sorted_data = sorted(monthly_sales.items(), key=lambda x: datetime.strptime(x[0], '%b %Y'))
+        chart_labels = [k for k, _ in sorted_data]
+        chart_data = [v for _, v in sorted_data]
 
-    return render_template('sales.html', username=session['username'], sales=sales_data,
-                           form=form, chart_labels=chart_labels, chart_data=chart_data)
+        return render_template('sales.html', username=session['username'], sales=sales_data,
+                            form=form, chart_labels=chart_labels, chart_data=chart_data)
+    except Exception as e:
+        logger.error(f"Error loading sales: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash(f'Error loading sales: {str(e)}', 'error')
+        return render_template('sales.html', username=session['username'], sales=[],
+                            form=form, chart_labels=[], chart_data=[])
 
 @app.route('/sales/delete/<string:sale_id>', methods=['POST'])
 def delete_sale(sale_id):
@@ -241,79 +281,130 @@ def expenses():
         return redirect(url_for('index'))
     form = ExpensesForm()
     if form.validate_on_submit():
-        db.collection('expenses').add({
-            'name': form.expenseName.data,
-            'amount': form.expenseAmount.data,
-            'date': form.expenseDate.data.strftime('%Y-%m-%d'),
-            'status': form.expenseStatus.data
-        })
-        flash('Expense added.', 'success')
-        return redirect(url_for('expenses'))
+        try:
+            data = {
+                'name': form.expenseName.data,
+                'amount': float(form.expenseAmount.data),
+                'date': form.expenseDate.data.strftime('%Y-%m-%d'),
+                'status': form.expenseStatus.data
+            }
+            db.collection('expenses').add(data)
+            flash('Expense added successfully.', 'success')
+            return redirect(url_for('expenses'))
+        except Exception as e:
+            logger.error(f"Error adding expense: {str(e)}")
+            logger.error(traceback.format_exc())
+            flash(f'Error adding expense: {str(e)}', 'error')
+            return redirect(url_for('expenses'))
 
-    docs = db.collection('expenses').stream()
-    expenses_data = []
-    monthly = defaultdict(float)
-    for doc in docs:
-        e = doc.to_dict()
-        e['id'] = doc.id
-        expenses_data.append(e)
-        dt = datetime.strptime(e['date'], '%Y-%m-%d')
-        monthly[dt.strftime('%b %Y')] += e.get('amount', 0)
+    try:
+        docs = db.collection('expenses').stream()
+        expenses_data = []
+        monthly = defaultdict(float)
+        for doc in docs:
+            e = doc.to_dict()
+            e['id'] = doc.id
+            # Ensure all required fields exist with default values
+            e['name'] = e.get('name', '')
+            e['amount'] = float(e.get('amount', 0))
+            e['date'] = e.get('date', '')
+            e['status'] = e.get('status', 'Pending')
+            expenses_data.append(e)
+            dt = datetime.strptime(e['date'], '%Y-%m-%d')
+            monthly[dt.strftime('%b %Y')] += e['amount']
 
-    sorted_data = sorted(monthly.items(), key=lambda x: datetime.strptime(x[0], '%b %Y'))
-    labels = [k for k, _ in sorted_data]
-    data = [v for _, v in sorted_data]
+        sorted_data = sorted(monthly.items(), key=lambda x: datetime.strptime(x[0], '%b %Y'))
+        labels = [k for k, _ in sorted_data]
+        data = [v for _, v in sorted_data]
 
-    return render_template('expenses.html', username=session['username'], expenses=expenses_data,
-                           form=form, chart_labels=labels, chart_data=data)
+        return render_template('expenses.html', username=session['username'], expenses=expenses_data,
+                            form=form, chart_labels=labels, chart_data=data)
+    except Exception as e:
+        logger.error(f"Error loading expenses: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash(f'Error loading expenses: {str(e)}', 'error')
+        return render_template('expenses.html', username=session['username'], expenses=[],
+                            form=form, chart_labels=[], chart_data=[])
 
 @app.route('/expenses/delete/<string:expense_id>', methods=['POST'])
 def delete_expense(expense_id):
     if 'username' not in session:
         return redirect(url_for('index'))
-    db.collection('expenses').document(expense_id).delete()
-    flash('Expense deleted.', 'success')
+    try:
+        if not expense_id:
+            flash('Invalid expense ID.', 'error')
+            return redirect(url_for('expenses'))
+            
+        # Check if the expense exists before deleting
+        expense_ref = db.collection('expenses').document(expense_id)
+        expense = expense_ref.get()
+        
+        if not expense.exists:
+            flash('Expense not found.', 'error')
+            return redirect(url_for('expenses'))
+            
+        expense_ref.delete()
+        flash('Expense deleted successfully.', 'success')
+    except Exception as e:
+        logger.error(f"Error deleting expense: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash(f'Error deleting expense: {str(e)}', 'error')
+        
     return redirect(url_for('expenses'))
 
 # ------------------ Calendar / Tasks ------------------ #
 @app.route('/calendar', methods=['GET', 'POST'])
 def calendar():
-    if 'username' not in session:
-        return redirect(url_for('index'))
-    form = TaskForm()
-    if form.validate_on_submit():
-        try:
-            dt_str = f"{form.taskDate.data.strftime('%Y-%m-%d')} {form.taskTime.data.strip()}" if form.taskTime.data else form.taskDate.data.strftime('%Y-%m-%d')
-            task_data = {
-                'name': form.taskName.data,
-                'datetime': dt_str,
-                'priority': form.taskPriority.data,
-                'done': False,
-                'price': float(form.taskPrice.data or 0)
-            }
-            db.collection('calendar_tasks').add(task_data)
-            flash('Task added.', 'success')
-        except Exception as e:
-            flash(f'Error adding task: {str(e)}', 'error')
-        return redirect(url_for('calendar'))
-
     try:
-        docs = db.collection('calendar_tasks').stream()
-        tasks = []
-        for doc in docs:
-            task = doc.to_dict()
-            task['id'] = doc.id
-            # Ensure all required fields exist with default values
-            task['name'] = task.get('name', '')
-            task['datetime'] = task.get('datetime', '')
-            task['priority'] = task.get('priority', 'normal')
-            task['done'] = task.get('done', False)
-            task['price'] = float(task.get('price', 0))
-            tasks.append(task)
-        return render_template('calendar.html', username=session['username'], tasks=tasks, form=form)
+        if 'username' not in session:
+            logger.warning("Unauthorized access attempt to calendar")
+            return redirect(url_for('index'))
+        
+        form = TaskForm()
+        if form.validate_on_submit():
+            try:
+                dt_str = f"{form.taskDate.data.strftime('%Y-%m-%d')} {form.taskTime.data.strip()}" if form.taskTime.data else form.taskDate.data.strftime('%Y-%m-%d')
+                task_data = {
+                    'name': form.taskName.data,
+                    'datetime': dt_str,
+                    'priority': form.taskPriority.data,
+                    'done': False,
+                    'price': float(form.taskPrice.data or 0)
+                }
+                db.collection('calendar_tasks').add(task_data)
+                logger.info(f"Task added successfully: {task_data['name']}")
+                flash('Task added.', 'success')
+            except Exception as e:
+                logger.error(f"Error adding task: {str(e)}")
+                logger.error(traceback.format_exc())
+                flash(f'Error adding task: {str(e)}', 'error')
+            return redirect(url_for('calendar'))
+
+        try:
+            docs = db.collection('calendar_tasks').stream()
+            tasks = []
+            for doc in docs:
+                task = doc.to_dict()
+                task['id'] = doc.id
+                # Ensure all required fields exist with default values
+                task['name'] = task.get('name', '')
+                task['datetime'] = task.get('datetime', '')
+                task['priority'] = task.get('priority', 'normal')
+                task['done'] = task.get('done', False)
+                task['price'] = float(task.get('price', 0))
+                tasks.append(task)
+            logger.info(f"Successfully loaded {len(tasks)} tasks")
+            return render_template('calendar.html', username=session['username'], tasks=tasks, form=form)
+        except Exception as e:
+            logger.error(f"Error loading tasks: {str(e)}")
+            logger.error(traceback.format_exc())
+            flash(f'Error loading tasks: {str(e)}', 'error')
+            return render_template('calendar.html', username=session['username'], tasks=[], form=form)
     except Exception as e:
-        flash(f'Error loading tasks: {str(e)}', 'error')
-        return render_template('calendar.html', username=session['username'], tasks=[], form=form)
+        logger.error(f"Unexpected error in calendar route: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('An unexpected error occurred.', 'error')
+        return redirect(url_for('dashboard'))
 
 @app.route('/calendar/update_task_status', methods=['POST'])
 def update_task_status():

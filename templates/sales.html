@@ -61,21 +61,25 @@
                         </div>
                         <div class="form-group">
                             {{ form.quantity.label }}
-                            {{ form.quantity(class="form-control", min="1") }}
+                            {{ form.quantity(class="form-control", min="1", id="quantity") }}
                         </div>
                         <div class="form-group">
                             {{ form.pricePerUnit.label }}
-                            {{ form.pricePerUnit(class="form-control", min="0", step="0.01") }}
+                            {{ form.pricePerUnit(class="form-control", min="0", step="0.01", id="pricePerUnit") }}
                         </div>
                         <div class="form-group">
                             {{ form.saleDate.label }}
                             {{ form.saleDate(class="form-control") }}
                         </div>
                         <div class="form-group">
+                            {{ form.saleStatus.label }}
+                            {{ form.saleStatus() }}
+                        </div>
+                        <div class="form-group">
                             <label for="saleAmount">Sale Amount (THB)</label>
                             <input type="text" id="saleAmount" readonly class="form-control" />
                         </div>
-                        <button type="submit" class="submit-btn">Submit Sale</button>
+                        <button type="submit" class="submit-btn">{{ form.submit.label.text }}</button>
                     </form>
                 </div>
 
@@ -114,8 +118,10 @@
                             <tr>
                                 <th onclick="sortTable(0)">Customer Name <i class="fas fa-sort"></i></th>
                                 <th onclick="sortTable(1)">Quantity <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable(2)">Sale Amount <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable(3)">Sale Date <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable(2)">Price per Unit <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable(3)">Total Amount <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable(4)">Date <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable(5)">Status <i class="fas fa-sort"></i></th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -124,15 +130,26 @@
                             <tr>
                                 <td>{{ sale.customer_name }}</td>
                                 <td>{{ sale.quantity }}</td>
+                                <td>฿{{ "{:,.2f}".format(sale.price_per_unit) }}</td>
                                 <td>฿{{ "{:,.2f}".format(sale.sale_amount) }}</td>
                                 <td>{{ sale.sale_date }}</td>
+                                <td>
+                                    <span class="status-badge {{ sale.status.lower() }}">{{ sale.status }}</span>
+                                    <form method="POST" action="{{ url_for('update_sale_status', sale_id=sale.id) }}" class="status-form">
+                                        {{ form.hidden_tag() }}
+                                        <select name="status" onchange="this.form.submit()" class="status-select">
+                                            <option value="Paid" {% if sale.status == 'Paid' %}selected{% endif %}>Paid</option>
+                                            <option value="Pending" {% if sale.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                        </select>
+                                    </form>
+                                </td>
                                 <td class="action-buttons">
                                     <button onclick="editSale('{{ sale.id }}')" class="edit-btn">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <form method="POST" action="{{ url_for('delete_sale', sale_id=sale.id) }}" 
                                           class="delete-form" onsubmit="return confirm('Are you sure you want to delete this sale?');">
-                                        {{ form.csrf_token }}
+                                        {{ form.hidden_tag() }}
                                         <button type="submit" class="delete-btn">
                                             <i class="fas fa-trash"></i>
                                         </button>
@@ -263,7 +280,7 @@
             
             rows.forEach(row => {
                 const customerName = row.cells[0].textContent.toLowerCase();
-                const saleDate = new Date(row.cells[3].textContent);
+                const saleDate = new Date(row.cells[4].textContent);
                 const matchesSearch = customerName.includes(searchText);
                 
                 let matchesDate = true;
