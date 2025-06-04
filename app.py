@@ -53,6 +53,7 @@ class SalesForm(FlaskForm):
     quantity = IntegerField('Quantity', validators=[DataRequired(), NumberRange(min=1)])
     pricePerUnit = FloatField('Price per Unit', validators=[DataRequired(), NumberRange(min=0)])
     saleDate = DateField('Sale Date', validators=[DataRequired()])
+    saleStatus = SelectField('Status', choices=[('Paid', 'Paid'), ('Pending', 'Pending')], validators=[DataRequired()])
     submit = SubmitField('Submit Sale')
 
 class ExpensesForm(FlaskForm):
@@ -162,7 +163,8 @@ def sales():
             'quantity': form.quantity.data,
             'price_per_unit': form.pricePerUnit.data,
             'sale_date': form.saleDate.data.strftime('%Y-%m-%d'),
-            'sale_amount': form.quantity.data * form.pricePerUnit.data
+            'sale_amount': form.quantity.data * form.pricePerUnit.data,
+            'status': form.saleStatus.data
         }
         db.collection('sales').add(data)
         flash('Sale added.', 'success')
@@ -175,8 +177,10 @@ def sales():
         sale = doc.to_dict()
         sale['id'] = doc.id
         sales_data.append(sale)
-        dt = datetime.strptime(sale['sale_date'], '%Y-%m-%d')
-        monthly_sales[dt.strftime('%b %Y')] += sale.get('sale_amount', 0)
+        # Only count paid sales in the monthly total
+        if sale.get('status') == 'Paid':
+            dt = datetime.strptime(sale['sale_date'], '%Y-%m-%d')
+            monthly_sales[dt.strftime('%b %Y')] += sale.get('sale_amount', 0)
     
     sorted_data = sorted(monthly_sales.items(), key=lambda x: datetime.strptime(x[0], '%b %Y'))
     chart_labels = [k for k, _ in sorted_data]
@@ -208,6 +212,26 @@ def delete_sale(sale_id):
         flash(f'Error deleting sale: {str(e)}', 'error')
         print(f"Error deleting sale: {str(e)}")  # For server-side logging
         
+    return redirect(url_for('sales'))
+
+@app.route('/sales/update_status/<string:sale_id>', methods=['POST'])
+def update_sale_status(sale_id):
+    if 'username' not in session:
+        return redirect(url_for('index'))
+    
+    ref = db.collection('sales').document(sale_id)
+    sale = ref.get()
+    if not sale.exists:
+        flash('Sale not found.', 'error')
+        return redirect(url_for('sales'))
+    
+    new_status = request.form.get('status')
+    if new_status not in ['Paid', 'Pending']:
+        flash('Invalid status.', 'error')
+        return redirect(url_for('sales'))
+    
+    ref.update({'status': new_status})
+    flash('Sale status updated.', 'success')
     return redirect(url_for('sales'))
 
 # ------------------ Expenses ------------------ #
@@ -258,32 +282,38 @@ def calendar():
         return redirect(url_for('index'))
     form = TaskForm()
     if form.validate_on_submit():
-        dt_str = f"{form.taskDate.data.strftime('%Y-%m-%d')} {form.taskTime.data.strip()}" if form.taskTime.data else form.taskDate.data.strftime('%Y-%m-%d')
-        task_data = {
-            'name': form.taskName.data,
-            'datetime': dt_str,
-            'priority': form.taskPriority.data,
-            'done': False
-        }
-        # Only add price if it's provided and valid
-        if form.taskPrice.data is not None:
-            task_data['price'] = float(form.taskPrice.data)
-        else:
-            task_data['price'] = 0.0
-            
-        db.collection('calendar_tasks').add(task_data)
-        flash('Task added.', 'success')
+        try:
+            dt_str = f"{form.taskDate.data.strftime('%Y-%m-%d')} {form.taskTime.data.strip()}" if form.taskTime.data else form.taskDate.data.strftime('%Y-%m-%d')
+            task_data = {
+                'name': form.taskName.data,
+                'datetime': dt_str,
+                'priority': form.taskPriority.data,
+                'done': False,
+                'price': float(form.taskPrice.data or 0)
+            }
+            db.collection('calendar_tasks').add(task_data)
+            flash('Task added.', 'success')
+        except Exception as e:
+            flash(f'Error adding task: {str(e)}', 'error')
         return redirect(url_for('calendar'))
 
-    docs = db.collection('calendar_tasks').stream()
-    tasks = []
-    for doc in docs:
-        task = doc.to_dict()
-        task['id'] = doc.id
-        # Ensure price is always a float
-        task['price'] = float(task.get('price', 0))
-        tasks.append(task)
-    return render_template('calendar.html', username=session['username'], tasks=tasks, form=form)
+    try:
+        docs = db.collection('calendar_tasks').stream()
+        tasks = []
+        for doc in docs:
+            task = doc.to_dict()
+            task['id'] = doc.id
+            # Ensure all required fields exist with default values
+            task['name'] = task.get('name', '')
+            task['datetime'] = task.get('datetime', '')
+            task['priority'] = task.get('priority', 'normal')
+            task['done'] = task.get('done', False)
+            task['price'] = float(task.get('price', 0))
+            tasks.append(task)
+        return render_template('calendar.html', username=session['username'], tasks=tasks, form=form)
+    except Exception as e:
+        flash(f'Error loading tasks: {str(e)}', 'error')
+        return render_template('calendar.html', username=session['username'], tasks=[], form=form)
 
 @app.route('/calendar/update_task_status', methods=['POST'])
 def update_task_status():

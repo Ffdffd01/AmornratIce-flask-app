@@ -112,14 +112,14 @@
                                 <span class="task-name {% if task.done %}task-done{% endif %}">{{ task.name }}</span>
                                 <span class="task-priority">{{ task.priority|title }}</span>
                                 <span class="task-datetime">{{ task.datetime }}</span>
-                                <span class="task-price">฿{{ "{:,.2f}".format(task.price|default(0)) }}</span>
+                                <span class="task-price">฿{{ "{:,.2f}".format(task.price) }}</span>
 
                                 <button type="submit" name="toggle_done" value="true" class="task-status {% if task.done %}done{% else %}not-done{% endif %}">
                                     {{ 'Done' if task.done else 'Not Done' }}
                                 </button>
                             </form>
                             <div class="task-actions">
-                                <button type="button" class="edit-btn" onclick="openEditModal('{{ task.id }}', '{{ task.name }}', '{{ task.datetime }}', '{{ task.priority }}', '{{ task.price }}')">
+                                <button type="button" class="edit-btn" onclick="openEditModal('{{ task.id }}', '{{ task.name|e }}', '{{ task.datetime|e }}', '{{ task.priority|e }}', '{{ task.price }}')">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" class="delete-form" onsubmit="return confirm('Are you sure you want to delete this task?');">
