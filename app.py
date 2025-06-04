@@ -13,6 +13,8 @@ import secrets
 import json
 import logging
 import traceback
+import time
+from functools import wraps
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,23 +27,48 @@ app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32))
 csrf = CSRFProtect(app)
 
+# Initialize Firebase with retry mechanism
+def initialize_firebase(max_retries=3, delay=1):
+    for attempt in range(max_retries):
+        try:
+            firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
+            if not firebase_credentials:
+                raise ValueError("FIREBASE_CREDENTIALS environment variable is not set")
+            
+            cred_dict = json.loads(firebase_credentials)
+            cred = credentials.Certificate(cred_dict)
+            firebase_app = initialize_app(cred)
+            db = firestore.client()
+            logger.info("Firebase initialized successfully")
+            return db
+        except Exception as e:
+            logger.error(f"Firebase initialization attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(delay)
+            else:
+                logger.error("All Firebase initialization attempts failed")
+                raise
+
 # Initialize Firebase
 try:
-    # Get credentials from environment variable
-    firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
-    if not firebase_credentials:
-        raise ValueError("FIREBASE_CREDENTIALS environment variable is not set")
-    
-    # Parse the JSON string from environment variable
-    cred_dict = json.loads(firebase_credentials)
-    cred = credentials.Certificate(cred_dict)
-    firebase_app = initialize_app(cred)
-    db = firestore.client()
-    logger.info("Firebase initialized successfully")
+    db = initialize_firebase()
 except Exception as e:
-    logger.error(f"Firebase initialization error: {str(e)}")
+    logger.error(f"Critical error: Could not initialize Firebase: {str(e)}")
     logger.error(traceback.format_exc())
     raise
+
+# Database connection decorator
+def with_db_connection(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            logger.error(f"Database error in {f.__name__}: {str(e)}")
+            logger.error(traceback.format_exc())
+            flash('A database error occurred. Please try again later.', 'error')
+            return render_template('error.html', error="Database connection error. Please try again later."), 500
+    return decorated_function
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -53,6 +80,11 @@ def internal_error(error):
 def not_found_error(error):
     logger.error(f"Not Found Error: {str(error)}")
     return render_template('error.html', error="The requested page was not found."), 404
+
+@app.errorhandler(502)
+def bad_gateway_error(error):
+    logger.error(f"Bad Gateway Error: {str(error)}")
+    return render_template('error.html', error="Service temporarily unavailable. Please try again later."), 502
 
 # ------------------ Forms ------------------ #
 class RegistrationForm(FlaskForm):
@@ -154,21 +186,28 @@ def logout():
     return redirect(url_for('index'))
 
 @app.route('/dashboard')
+@with_db_connection
 def dashboard():
     if 'username' not in session:
         return redirect(url_for('index'))
 
-    sales = [doc.to_dict() for doc in db.collection('sales').stream()]
-    total_sales = sum(s.get('sale_amount', 0) for s in sales)
+    try:
+        sales = [doc.to_dict() for doc in db.collection('sales').stream()]
+        total_sales = sum(s.get('sale_amount', 0) for s in sales)
 
-    expenses = [doc.to_dict() for doc in db.collection('expenses').stream()]
-    paid = sum(e.get('amount', 0) for e in expenses if e.get('status') == 'Paid')
-    pending = sum(e.get('amount', 0) for e in expenses if e.get('status') == 'Pending')
+        expenses = [doc.to_dict() for doc in db.collection('expenses').stream()]
+        paid = sum(e.get('amount', 0) for e in expenses if e.get('status') == 'Paid')
+        pending = sum(e.get('amount', 0) for e in expenses if e.get('status') == 'Pending')
 
-    net_income = total_sales - paid
+        net_income = total_sales - paid
 
-    return render_template('dashboard.html', username=session['username'], total_sales=total_sales,
+        return render_template('dashboard.html', username=session['username'], total_sales=total_sales,
                            paid_expenses=paid, pending_expenses=pending, net_income=net_income)
+    except Exception as e:
+        logger.error(f"Error in dashboard: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash('Error loading dashboard data. Please try again later.', 'error')
+        return render_template('error.html', error="Error loading dashboard data. Please try again later."), 500
 
 # ------------------ Sales ------------------ #
 @app.route('/sales', methods=['GET', 'POST'])
