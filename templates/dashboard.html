@@ -39,15 +39,15 @@
                 <div class="sales-cards" style="display: flex; justify-content: space-between; gap: 10px;">
                     <div class="card">
                         <h3>Total Sales</h3>
-                        <p class="amount amount-green">${{ total_sales }}</p>
+                        <p class="amount amount-green">฿{{ "{:,.2f}".format(total_sales) }}</p>
                     </div>
                     <div class="card">
                         <h3>Total Pending</h3>
-                        <p class="amount amount-red">${{ total_pending }}</p>
+                        <p class="amount amount-red">฿{{ "{:,.2f}".format(total_pending) }}</p>
                     </div>
                     <div class="card">
                         <h3>Net Sales</h3>
-                        <p class="amount amount-green">${{ net_sale }}</p>
+                        <p class="amount amount-green">฿{{ "{:,.2f}".format(net_sale) }}</p>
                     </div>
                 </div>
             </div>
@@ -58,11 +58,11 @@
                 <div class="expenses-cards">
                     <div class="card">
                         <h3>Paid Expenses</h3>
-                        <p class="amount amount-red">${{ paid_expenses }}</p>
+                        <p class="amount amount-red">฿{{ "{:,.2f}".format(paid_expenses) }}</p>
                     </div>
                     <div class="card">
                         <h3>Pending Expenses</h3>
-                        <p class="amount amount-red">${{ pending_expenses }}</p>
+                        <p class="amount amount-red">฿{{ "{:,.2f}".format(pending_expenses) }}</p>
                     </div>
                 </div>
             </div>
@@ -112,29 +112,29 @@
                     {
                         label: 'Daily Sales',
                         data: dailySales,
-                        borderColor: '#618c26',
-                        backgroundColor: 'rgba(0, 128, 0, 0.1)',
+                        borderColor: '#2a9d8f',
+                        backgroundColor: 'rgba(42, 157, 143, 0.1)',
                         fill: true,
                     },
                     {
                         label: 'Daily Pending',
                         data: dailyPending,
-                        borderColor: 'red',
-                        backgroundColor: 'rgba(255, 0, 0, 0.1)',
+                        borderColor: '#e76f51',
+                        backgroundColor: 'rgba(231, 111, 81, 0.1)',
                         fill: true,
                     },
                     {
                         label: 'Expenses Paid',
                         data: dailyExpensesPaid,
-                        borderColor: '#0077b6',
-                        backgroundColor: 'rgba(0, 0, 255, 0.1)',
+                        borderColor: '#264653',
+                        backgroundColor: 'rgba(38, 70, 83, 0.1)',
                         fill: true,
                     },
                     {
                         label: 'Expenses Pending',
                         data: dailyExpensesPending,
-                        borderColor: 'orange',
-                        backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                        borderColor: '#e9c46a',
+                        backgroundColor: 'rgba(233, 196, 106, 0.1)',
                         fill: true,
                     }
                 ]
@@ -156,8 +156,13 @@
                         beginAtZero: true,
                         title: {
                             display: true,
-                            text: 'Amount ($)',
+                            text: 'Amount (THB)',
                         },
+                        ticks: {
+                            callback: function(value) {
+                                return '฿' + value.toLocaleString('th-TH');
+                            }
+                        }
                     },
                     x: {
                         title: {

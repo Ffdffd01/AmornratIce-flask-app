@@ -144,6 +144,13 @@
                                     <span class="status-badge {{ expense.status.lower() }}">
                                         {{ expense.status }}
                                     </span>
+                                    <form method="POST" action="{{ url_for('update_expense_status', expense_id=expense.id) }}" class="status-form">
+                                        {{ form.hidden_tag() }}
+                                        <select name="status" onchange="this.form.submit()" class="status-select">
+                                            <option value="Paid" {% if expense.status == 'Paid' %}selected{% endif %}>Paid</option>
+                                            <option value="Pending" {% if expense.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                        </select>
+                                    </form>
                                 </td>
                                 <td class="action-buttons">
                                     <button onclick="editExpense('{{ expense.id }}')" class="edit-btn">
@@ -317,6 +324,55 @@
             type: 'line',
             data: chartData,
             options: chartOptions
+        });
+
+        // Edit expense functionality
+        function editExpense(expenseId) {
+            const row = document.querySelector(`tr[data-expense-id="${expenseId}"]`);
+            if (!row) return;
+
+            const name = row.cells[0].textContent;
+            const amount = parseFloat(row.cells[1].textContent.replace(/[฿,]/g, ''));
+            const date = row.cells[2].textContent;
+            const status = row.cells[3].querySelector('.status-badge').textContent.trim();
+
+            // Populate the form
+            document.getElementById('editExpenseName').value = name;
+            document.getElementById('editExpenseAmount').value = amount;
+            document.getElementById('editExpenseDate').value = date;
+            document.getElementById('editExpenseStatus').value = status;
+            document.getElementById('editExpenseForm').action = `/expenses/edit/${expenseId}`;
+
+            // Show the modal
+            document.getElementById('editExpenseModal').style.display = 'block';
+        }
+
+        // Close modal when clicking the close button or outside the modal
+        document.querySelector('.close').onclick = function() {
+            document.getElementById('editExpenseModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('editExpenseModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Form validation
+        document.getElementById('editExpenseForm').addEventListener('submit', function(e) {
+            let isValid = true;
+            const amountInput = document.getElementById('editExpenseAmount');
+            
+            // Validate amount
+            if (amountInput.value < 0) {
+                document.getElementById('editExpenseAmountError').textContent = 'Amount cannot be negative';
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+            }
         });
     </script>
 </body>

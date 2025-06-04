@@ -68,7 +68,7 @@ class LoginForm(FlaskForm):
     submit = SubmitField('Login')
 
 class SalesForm(FlaskForm):
-    customerName = StringField('Customer Name', validators=[DataRequired()])
+    customerName = StringField('Customer Name', validators=[DataRequired(), Length(min=2, max=100)])
     quantity = IntegerField('Quantity', validators=[DataRequired(), NumberRange(min=1)])
     pricePerUnit = FloatField('Price per Unit', validators=[DataRequired(), NumberRange(min=0)])
     saleDate = DateField('Sale Date', validators=[DataRequired()])

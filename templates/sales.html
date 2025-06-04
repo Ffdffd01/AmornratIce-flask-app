@@ -52,7 +52,7 @@
                         {{ form.hidden_tag() }}
                         <div class="form-group">
                             {{ form.customerName.label }}
-                            {{ form.customerName(class="form-control", list="customers") }}
+                            {{ form.customerName(class="form-control", list="customers", autocomplete="off", placeholder="Enter customer name") }}
                             <datalist id="customers">
                                 {% for sale in sales %}
                                     <option value="{{ sale.customer_name }}">
