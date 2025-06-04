@@ -21,16 +21,14 @@ csrf = CSRFProtect(app)
 
 # Initialize Firebase
 try:
-    # Try to get credentials from environment variable first
+    # Get credentials from environment variable
     firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
-    if firebase_credentials:
-        # Parse the JSON string from environment variable
-        cred_dict = json.loads(firebase_credentials)
-        cred = credentials.Certificate(cred_dict)
-    else:
-        # Fall back to file-based credentials
-        cred = credentials.Certificate(os.getenv('FIREBASE_CREDENTIALS_PATH'))
+    if not firebase_credentials:
+        raise ValueError("FIREBASE_CREDENTIALS environment variable is not set")
     
+    # Parse the JSON string from environment variable
+    cred_dict = json.loads(firebase_credentials)
+    cred = credentials.Certificate(cred_dict)
     firebase_app = initialize_app(cred)
     db = firestore.client()
 except Exception as e:
@@ -190,8 +188,25 @@ def sales():
 def delete_sale(sale_id):
     if 'username' not in session:
         return redirect(url_for('index'))
-    db.collection('sales').document(sale_id).delete()
-    flash('Sale deleted.', 'success')
+    try:
+        if not sale_id:
+            flash('Invalid sale ID.', 'error')
+            return redirect(url_for('sales'))
+            
+        # Check if the sale exists before deleting
+        sale_ref = db.collection('sales').document(sale_id)
+        sale = sale_ref.get()
+        
+        if not sale.exists:
+            flash('Sale not found.', 'error')
+            return redirect(url_for('sales'))
+            
+        sale_ref.delete()
+        flash('Sale deleted successfully.', 'success')
+    except Exception as e:
+        flash(f'Error deleting sale: {str(e)}', 'error')
+        print(f"Error deleting sale: {str(e)}")  # For server-side logging
+        
     return redirect(url_for('sales'))
 
 # ------------------ Expenses ------------------ #
