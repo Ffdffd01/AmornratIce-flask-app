@@ -48,6 +48,7 @@
                 <div class="sales-form-container">
                     <h2>Enter Expense Details</h2>
                     <form class="sales-form" method="POST" action="{{ url_for('expenses') }}">
+                        {{ form.hidden_tag() }}
                         <div class="form-group">
                             <label for="expenseName">Expense Name</label>
                             <input type="text" id="expenseName" name="expenseName" class="form-control" required />
@@ -133,6 +134,7 @@
                                     </button>
                                     <form method="POST" action="{{ url_for('delete_expense', expense_id=expense.id) }}" 
                                           class="delete-form" onsubmit="return confirm('Are you sure you want to delete this expense?');">
+                                        {{ form.csrf_token }}
                                         <button type="submit" class="delete-btn">
                                             <i class="fas fa-trash"></i>
                                         </button>
