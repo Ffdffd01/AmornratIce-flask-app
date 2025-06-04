@@ -363,13 +363,23 @@ def calendar():
         form = TaskForm()
         if form.validate_on_submit():
             try:
-                dt_str = f"{form.taskDate.data.strftime('%Y-%m-%d')} {form.taskTime.data.strip()}" if form.taskTime.data else form.taskDate.data.strftime('%Y-%m-%d')
+                # Safely handle datetime
+                date_str = form.taskDate.data.strftime('%Y-%m-%d')
+                time_str = form.taskTime.data.strip() if form.taskTime.data else ''
+                dt_str = f"{date_str} {time_str}" if time_str else date_str
+                
+                # Safely handle price
+                try:
+                    price = float(form.taskPrice.data or 0)
+                except (ValueError, TypeError):
+                    price = 0.0
+                
                 task_data = {
                     'name': form.taskName.data,
                     'datetime': dt_str,
                     'priority': form.taskPriority.data,
                     'done': False,
-                    'price': float(form.taskPrice.data or 0)
+                    'price': price
                 }
                 db.collection('calendar_tasks').add(task_data)
                 logger.info(f"Task added successfully: {task_data['name']}")
@@ -391,7 +401,10 @@ def calendar():
                 task['datetime'] = task.get('datetime', '')
                 task['priority'] = task.get('priority', 'normal')
                 task['done'] = task.get('done', False)
-                task['price'] = float(task.get('price', 0))
+                try:
+                    task['price'] = float(task.get('price', 0))
+                except (ValueError, TypeError):
+                    task['price'] = 0.0
                 tasks.append(task)
             logger.info(f"Successfully loaded {len(tasks)} tasks")
             return render_template('calendar.html', username=session['username'], tasks=tasks, form=form)
@@ -432,29 +445,40 @@ def delete_task(task_id):
 
 @app.route('/calendar/edit/<string:task_id>', methods=['POST'])
 def edit_task(task_id):
-    ref = db.collection('calendar_tasks').document(task_id)
-    if not ref.get().exists:
-        flash('Task not found.', 'error')
-        return redirect(url_for('calendar'))
+    try:
+        ref = db.collection('calendar_tasks').document(task_id)
+        task = ref.get()
+        if not task.exists:
+            flash('Task not found.', 'error')
+            return redirect(url_for('calendar'))
 
-    name = request.form.get('taskName')
-    date = request.form.get('taskDate')
-    time = request.form.get('taskTime', '').strip()
-    priority = request.form.get('taskPriority')
-    price = float(request.form.get('taskPrice', 0))
+        name = request.form.get('taskName')
+        date = request.form.get('taskDate')
+        time = request.form.get('taskTime', '').strip()
+        priority = request.form.get('taskPriority')
+        
+        # Safely handle price
+        try:
+            price = float(request.form.get('taskPrice', 0))
+        except (ValueError, TypeError):
+            price = 0.0
 
-    if not name or not date or not priority:
-        flash('Missing required fields.', 'error')
-        return redirect(url_for('calendar'))
+        if not name or not date or not priority:
+            flash('Missing required fields.', 'error')
+            return redirect(url_for('calendar'))
 
-    dt_str = f"{date} {time}" if time else date
-    ref.update({
-        'name': name,
-        'datetime': dt_str,
-        'priority': priority,
-        'price': price
-    })
-    flash('Task updated.', 'success')
+        dt_str = f"{date} {time}" if time else date
+        ref.update({
+            'name': name,
+            'datetime': dt_str,
+            'priority': priority,
+            'price': price
+        })
+        flash('Task updated.', 'success')
+    except Exception as e:
+        logger.error(f"Error updating task: {str(e)}")
+        logger.error(traceback.format_exc())
+        flash(f'Error updating task: {str(e)}', 'error')
     return redirect(url_for('calendar'))
 
 # ------------------ Run App ------------------ #
