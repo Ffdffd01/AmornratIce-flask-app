@@ -132,6 +132,7 @@
                                     </button>
                                     <form method="POST" action="{{ url_for('delete_sale', sale_id=sale.id) }}" 
                                           class="delete-form" onsubmit="return confirm('Are you sure you want to delete this sale?');">
+                                        {{ form.csrf_token }}
                                         <button type="submit" class="delete-btn">
                                             <i class="fas fa-trash"></i>
                                         </button>
