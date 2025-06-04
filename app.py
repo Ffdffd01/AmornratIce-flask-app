@@ -259,18 +259,30 @@ def calendar():
     form = TaskForm()
     if form.validate_on_submit():
         dt_str = f"{form.taskDate.data.strftime('%Y-%m-%d')} {form.taskTime.data.strip()}" if form.taskTime.data else form.taskDate.data.strftime('%Y-%m-%d')
-        db.collection('calendar_tasks').add({
+        task_data = {
             'name': form.taskName.data,
             'datetime': dt_str,
             'priority': form.taskPriority.data,
-            'price': form.taskPrice.data,
             'done': False
-        })
+        }
+        # Only add price if it's provided and valid
+        if form.taskPrice.data is not None:
+            task_data['price'] = float(form.taskPrice.data)
+        else:
+            task_data['price'] = 0.0
+            
+        db.collection('calendar_tasks').add(task_data)
         flash('Task added.', 'success')
         return redirect(url_for('calendar'))
 
     docs = db.collection('calendar_tasks').stream()
-    tasks = [dict(doc.to_dict(), id=doc.id) for doc in docs]
+    tasks = []
+    for doc in docs:
+        task = doc.to_dict()
+        task['id'] = doc.id
+        # Ensure price is always a float
+        task['price'] = float(task.get('price', 0))
+        tasks.append(task)
     return render_template('calendar.html', username=session['username'], tasks=tasks, form=form)
 
 @app.route('/calendar/update_task_status', methods=['POST'])
