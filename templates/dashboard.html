@@ -39,15 +39,15 @@
                 <div class="sales-cards" style="display: flex; justify-content: space-between; gap: 10px;">
                     <div class="card">
                         <h3>Total Sales</h3>
-                        <p class="amount amount-green">฿{{ "{:,.2f}".format(total_sales) }}</p>
+                        <p class="amount amount-green">฿{{ "{:,.2f}".format(total_sales|default(0)|float) }}</p>
                     </div>
                     <div class="card">
                         <h3>Total Pending</h3>
-                        <p class="amount amount-red">฿{{ "{:,.2f}".format(total_pending) }}</p>
+                        <p class="amount amount-red">฿{{ "{:,.2f}".format(pending_expenses|default(0)|float) }}</p>
                     </div>
                     <div class="card">
                         <h3>Net Sales</h3>
-                        <p class="amount amount-green">฿{{ "{:,.2f}".format(net_sale) }}</p>
+                        <p class="amount amount-green">฿{{ "{:,.2f}".format(net_income|default(0)|float) }}</p>
                     </div>
                 </div>
             </div>
@@ -58,11 +58,11 @@
                 <div class="expenses-cards">
                     <div class="card">
                         <h3>Paid Expenses</h3>
-                        <p class="amount amount-red">฿{{ "{:,.2f}".format(paid_expenses) }}</p>
+                        <p class="amount amount-red">฿{{ "{:,.2f}".format(paid_expenses|default(0)|float) }}</p>
                     </div>
                     <div class="card">
                         <h3>Pending Expenses</h3>
-                        <p class="amount amount-red">฿{{ "{:,.2f}".format(pending_expenses) }}</p>
+                        <p class="amount amount-red">฿{{ "{:,.2f}".format(pending_expenses|default(0)|float) }}</p>
                     </div>
                 </div>
             </div>

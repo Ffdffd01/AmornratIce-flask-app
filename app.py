@@ -224,17 +224,44 @@ def dashboard():
         return redirect(url_for('index'))
 
     try:
-        sales = [doc.to_dict() for doc in db.collection('sales').stream()]
-        total_sales = sum(s.get('sale_amount', 0) for s in sales)
+        # Initialize default values
+        total_sales = 0
+        paid_expenses = 0
+        pending_expenses = 0
+        net_income = 0
 
-        expenses = [doc.to_dict() for doc in db.collection('expenses').stream()]
-        paid = sum(e.get('amount', 0) for e in expenses if e.get('status') == 'Paid')
-        pending = sum(e.get('amount', 0) for e in expenses if e.get('status') == 'Pending')
+        # Get sales data
+        try:
+            sales = [doc.to_dict() for doc in db.collection('sales').stream()]
+            total_sales = sum(float(s.get('sale_amount', 0) or 0) for s in sales)
+        except Exception as e:
+            logger.error(f"Error getting sales data: {str(e)}")
+            sales = []
 
-        net_income = total_sales - paid
+        # Get expenses data
+        try:
+            expenses = [doc.to_dict() for doc in db.collection('expenses').stream()]
+            paid_expenses = sum(float(e.get('amount', 0) or 0) for e in expenses if e.get('status') == 'Paid')
+            pending_expenses = sum(float(e.get('amount', 0) or 0) for e in expenses if e.get('status') == 'Pending')
+        except Exception as e:
+            logger.error(f"Error getting expenses data: {str(e)}")
+            expenses = []
 
-        return render_template('dashboard.html', username=session['username'], total_sales=total_sales,
-                           paid_expenses=paid, pending_expenses=pending, net_income=net_income)
+        # Calculate net income
+        net_income = total_sales - paid_expenses
+
+        # Format numbers to ensure they are valid
+        total_sales = float(total_sales or 0)
+        paid_expenses = float(paid_expenses or 0)
+        pending_expenses = float(pending_expenses or 0)
+        net_income = float(net_income or 0)
+
+        return render_template('dashboard.html', 
+                             username=session['username'],
+                             total_sales=total_sales,
+                             paid_expenses=paid_expenses,
+                             pending_expenses=pending_expenses,
+                             net_income=net_income)
     except Exception as e:
         logger.error(f"Error in dashboard: {str(e)}")
         logger.error(traceback.format_exc())
