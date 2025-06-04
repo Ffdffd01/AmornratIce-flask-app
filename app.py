@@ -67,6 +67,7 @@ class TaskForm(FlaskForm):
     taskDate = DateField('Task Date', validators=[DataRequired()])
     taskTime = StringField('Task Time (optional)')
     taskPriority = SelectField('Priority', choices=[('normal', 'Normal'), ('high', 'High')], validators=[DataRequired()])
+    taskPrice = FloatField('Price (THB)', validators=[NumberRange(min=0)], default=0)
     submit = SubmitField('Add Task')
 
 # ------------------ Routes ------------------ #
@@ -262,6 +263,7 @@ def calendar():
             'name': form.taskName.data,
             'datetime': dt_str,
             'priority': form.taskPriority.data,
+            'price': form.taskPrice.data,
             'done': False
         })
         flash('Task added.', 'success')
@@ -306,13 +308,19 @@ def edit_task(task_id):
     date = request.form.get('taskDate')
     time = request.form.get('taskTime', '').strip()
     priority = request.form.get('taskPriority')
+    price = float(request.form.get('taskPrice', 0))
 
     if not name or not date or not priority:
         flash('Missing required fields.', 'error')
         return redirect(url_for('calendar'))
 
     dt_str = f"{date} {time}" if time else date
-    ref.update({'name': name, 'datetime': dt_str, 'priority': priority})
+    ref.update({
+        'name': name,
+        'datetime': dt_str,
+        'priority': priority,
+        'price': price
+    })
     flash('Task updated.', 'success')
     return redirect(url_for('calendar'))
 
