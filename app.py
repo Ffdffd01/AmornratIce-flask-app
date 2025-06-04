@@ -15,9 +15,16 @@ import logging
 import traceback
 import time
 from functools import wraps
+import sys
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -33,9 +40,15 @@ def initialize_firebase(max_retries=3, delay=1):
         try:
             firebase_credentials = os.getenv('FIREBASE_CREDENTIALS')
             if not firebase_credentials:
+                logger.error("FIREBASE_CREDENTIALS environment variable is not set")
                 raise ValueError("FIREBASE_CREDENTIALS environment variable is not set")
             
-            cred_dict = json.loads(firebase_credentials)
+            try:
+                cred_dict = json.loads(firebase_credentials)
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON in FIREBASE_CREDENTIALS: {str(e)}")
+                raise ValueError("Invalid JSON in FIREBASE_CREDENTIALS")
+            
             cred = credentials.Certificate(cred_dict)
             firebase_app = initialize_app(cred)
             db = firestore.client()
@@ -69,6 +82,23 @@ def with_db_connection(f):
             flash('A database error occurred. Please try again later.', 'error')
             return render_template('error.html', error="Database connection error. Please try again later."), 500
     return decorated_function
+
+# Session management
+@app.before_request
+def before_request():
+    if 'username' in session:
+        # Check if the session is still valid
+        try:
+            user = auth.get_user_by_email(session.get('email'))
+            if not user:
+                session.clear()
+                flash('Session expired. Please login again.', 'error')
+                return redirect(url_for('index'))
+        except Exception as e:
+            logger.error(f"Session validation error: {str(e)}")
+            session.clear()
+            flash('Session error. Please login again.', 'error')
+            return redirect(url_for('index'))
 
 @app.errorhandler(500)
 def internal_error(error):
@@ -175,7 +205,9 @@ def login():
                 flash('User data missing in Firestore.', 'error')
         except auth.UserNotFoundError:
             flash('User not found. Please register.', 'error')
-        except Exception:
+        except Exception as e:
+            logger.error(f"Login error: {str(e)}")
+            logger.error(traceback.format_exc())
             flash('Invalid credentials.', 'error')
     return render_template('login.html', form=form)
 
@@ -522,4 +554,13 @@ def edit_task(task_id):
 
 # ------------------ Run App ------------------ #
 if __name__ == '__main__':
+    # Set up proper logging for production
+    if not app.debug:
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.StreamHandler(sys.stdout)
+            ]
+        )
     app.run(debug=False)
