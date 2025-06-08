@@ -1,11 +1,11 @@
 # app.py
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_wtf import FlaskForm, CSRFProtect
 from wtforms import StringField, IntegerField, FloatField, DateField, SelectField, SubmitField, PasswordField
 from wtforms.validators import DataRequired, NumberRange, Email, Length
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 from firebase_admin import credentials, initialize_app, auth, firestore
 from dotenv import load_dotenv
@@ -16,6 +16,7 @@ import traceback
 import time
 from functools import wraps
 import sys
+import pytz
 
 # Configure logging
 logging.basicConfig(
@@ -578,6 +579,80 @@ def edit_task(task_id):
         logger.error(traceback.format_exc())
         flash(f'Error updating task: {str(e)}', 'error')
     return redirect(url_for('calendar'))
+
+@app.route('/api/chart-data')
+@with_db_connection
+def get_chart_data():
+    try:
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        
+        if not start_date or not end_date:
+            return jsonify({'error': 'Start date and end date are required'}), 400
+            
+        start_date = datetime.strptime(start_date, '%Y-%m-%d')
+        end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        # Get sales data
+        sales = [doc.to_dict() for doc in db.collection('sales').stream()]
+        expenses = [doc.to_dict() for doc in db.collection('expenses').stream()]
+        
+        # Initialize data structures
+        daily_sales = defaultdict(float)
+        daily_pending = defaultdict(float)
+        daily_expenses_paid = defaultdict(float)
+        daily_expenses_pending = defaultdict(float)
+        
+        # Process sales data
+        for sale in sales:
+            try:
+                sale_date = datetime.strptime(sale.get('sale_date', ''), '%Y-%m-%d')
+                if start_date <= sale_date <= end_date:
+                    amount = float(sale.get('sale_amount', 0) or 0)
+                    if sale.get('status') == 'Paid':
+                        daily_sales[sale_date.strftime('%Y-%m-%d')] += amount
+                    else:
+                        daily_pending[sale_date.strftime('%Y-%m-%d')] += amount
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error processing sale data: {str(e)}")
+                continue
+        
+        # Process expenses data
+        for expense in expenses:
+            try:
+                expense_date = datetime.strptime(expense.get('date', ''), '%Y-%m-%d')
+                if start_date <= expense_date <= end_date:
+                    amount = float(expense.get('amount', 0) or 0)
+                    if expense.get('status') == 'Paid':
+                        daily_expenses_paid[expense_date.strftime('%Y-%m-%d')] += amount
+                    else:
+                        daily_expenses_pending[expense_date.strftime('%Y-%m-%d')] += amount
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error processing expense data: {str(e)}")
+                continue
+        
+        # Generate date range
+        date_range = []
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime('%Y-%m-%d')
+            date_range.append(date_str)
+            current_date += timedelta(days=1)
+        
+        # Prepare response data
+        response_data = {
+            'labels': date_range,
+            'daily_sales': [daily_sales.get(date, 0) for date in date_range],
+            'daily_pending': [daily_pending.get(date, 0) for date in date_range],
+            'daily_expenses_paid': [daily_expenses_paid.get(date, 0) for date in date_range],
+            'daily_expenses_pending': [daily_expenses_pending.get(date, 0) for date in date_range]
+        }
+        
+        return jsonify(response_data)
+    except Exception as e:
+        logger.error(f"Error generating chart data: {str(e)}")
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Error generating chart data'}), 500
 
 # ------------------ Run App ------------------ #
 if __name__ == '__main__':

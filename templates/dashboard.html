@@ -13,10 +13,10 @@
         <div>
             <div class="logo">Welcome, {{ username }} </div>
             <div class="nav-links">
-                <a href="{{ url_for('dashboard') }}"><i class="fas fa-home"></i> Home </a>
+                <a href="{{ url_for('dashboard') }}" class="active"><i class="fas fa-home"></i> Home </a>
                 <a href="{{ url_for('sales') }}"><i class="fas fa-chart-line"></i> Sales</a>
                 <a href="{{ url_for('expenses') }}"><i class="fas fa-receipt"></i> Expenses</a>
-                <a href="{{ url_for('calendar') }}" class="active"><i class="fas fa-calendar-alt"></i> Calendar</a>
+                <a href="{{ url_for('calendar') }}"><i class="fas fa-calendar-alt"></i> Calendar</a>
             </div>            
         </div>
         <div class="sidebar-bottom">
@@ -73,9 +73,9 @@
                 <div class="chart-header">
                     <div class="date-range">
                         <label for="start-date">Start Date:</label>
-                        <input type="date" id="start-date" name="start-date">
+                        <input type="date" id="start-date" name="start-date" onchange="updateChart()">
                         <label for="end-date">End Date:</label>
-                        <input type="date" id="end-date" name="end-date">
+                        <input type="date" id="end-date" name="end-date" onchange="updateChart()">
                     </div>
                 </div>
 
@@ -94,85 +94,107 @@
     </div>
 
     <script>
-        const ctx = document.getElementById('dashboardChart').getContext('2d');
+        let chart = null;
 
-        // Dummy daily data (replace with dynamic data if available)
-        const labels = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        function updateChart() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            
+            if (!startDate || !endDate) return;
 
-        const dailySales = [150, 200, 180, 220, 250, 300, 280];
-        const dailyPending = [20, 30, 25, 40, 35, 50, 45];
-        const dailyExpensesPaid = [300, 350, 320, 400, 420, 460, 430];
-        const dailyExpensesPending = [100, 90, 80, 120, 110, 130, 125];
-
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Daily Sales',
-                        data: dailySales,
-                        borderColor: '#2a9d8f',
-                        backgroundColor: 'rgba(42, 157, 143, 0.1)',
-                        fill: true,
-                    },
-                    {
-                        label: 'Daily Pending',
-                        data: dailyPending,
-                        borderColor: '#e76f51',
-                        backgroundColor: 'rgba(231, 111, 81, 0.1)',
-                        fill: true,
-                    },
-                    {
-                        label: 'Expenses Paid',
-                        data: dailyExpensesPaid,
-                        borderColor: '#264653',
-                        backgroundColor: 'rgba(38, 70, 83, 0.1)',
-                        fill: true,
-                    },
-                    {
-                        label: 'Expenses Pending',
-                        data: dailyExpensesPending,
-                        borderColor: '#e9c46a',
-                        backgroundColor: 'rgba(233, 196, 106, 0.1)',
-                        fill: true,
+            fetch(`/api/chart-data?start_date=${startDate}&end_date=${endDate}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (chart) {
+                        chart.destroy();
                     }
-                ]
-            },
-            options: {
-                responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Daily Sales and Expenses Comparison',
-                    },
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Amount (THB)',
+                    
+                    const ctx = document.getElementById('dashboardChart').getContext('2d');
+                    chart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [
+                                {
+                                    label: 'Daily Sales',
+                                    data: data.daily_sales,
+                                    borderColor: '#2a9d8f',
+                                    backgroundColor: 'rgba(42, 157, 143, 0.1)',
+                                    fill: true,
+                                },
+                                {
+                                    label: 'Daily Pending',
+                                    data: data.daily_pending,
+                                    borderColor: '#e76f51',
+                                    backgroundColor: 'rgba(231, 111, 81, 0.1)',
+                                    fill: true,
+                                },
+                                {
+                                    label: 'Expenses Paid',
+                                    data: data.daily_expenses_paid,
+                                    borderColor: '#264653',
+                                    backgroundColor: 'rgba(38, 70, 83, 0.1)',
+                                    fill: true,
+                                },
+                                {
+                                    label: 'Expenses Pending',
+                                    data: data.daily_expenses_pending,
+                                    borderColor: '#e9c46a',
+                                    backgroundColor: 'rgba(233, 196, 106, 0.1)',
+                                    fill: true,
+                                }
+                            ]
                         },
-                        ticks: {
-                            callback: function(value) {
-                                return '฿' + value.toLocaleString('th-TH');
-                            }
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Days',
+                        options: {
+                            responsive: true,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false,
+                            },
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Daily Sales and Expenses Comparison',
+                                },
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    title: {
+                                        display: true,
+                                        text: 'Amount (THB)',
+                                    },
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '฿' + value.toLocaleString('th-TH');
+                                        }
+                                    }
+                                },
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: 'Days',
+                                    },
+                                },
+                            },
                         },
-                    },
-                },
-            },
-        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching chart data:', error);
+                    alert('Error loading chart data. Please try again.');
+                });
+        }
+
+        // Set default date range (last 7 days)
+        const today = new Date();
+        const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        
+        document.getElementById('start-date').value = lastWeek.toISOString().split('T')[0];
+        document.getElementById('end-date').value = today.toISOString().split('T')[0];
+        
+        // Initial chart load
+        updateChart();
     </script>
 
 </body>
